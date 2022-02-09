@@ -1,11 +1,19 @@
-
-import 'dart:math';
+// import 'dart:math';
 
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:popup_statefull/bloc/option_bloc.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => OptionBloc())
+      ], 
+      child: const MyApp()
+    )
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -14,12 +22,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'PopUp StatefulBuilder',
+      title: 'PopUp Bloc',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(     
+      theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(title: 'PopUp StatefulBuilder'),
+      home: const MyHomePage(title: 'PopUp Bloc'),
     );
   }
 }
@@ -34,12 +42,12 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _options = 0;
+  // int _options = 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(   
+      appBar: AppBar(
         title: Text(widget.title),
       ),
       body: const Center(
@@ -47,74 +55,63 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          setState(() => _options = 0);
           showDialog<void>(
-            context: context, 
-            builder: (context) {
-              
-              return StatefulBuilder(
-                builder: (context, setState) {
-
-                  return FadeIn(
-                    duration: const Duration(milliseconds: 500),
-                    child: AlertDialog(
-                      scrollable: true,
-                      actionsAlignment: MainAxisAlignment.center,
-                      title: const _Title(),
-                      content: _Content(options: _options),
-                      actions: _options == 0 
-                        ? _buttons(_options, setState, context)
-                        : _options != 1 
-                        ? _salir(context)
-                        : [],
-                    ),
-                  );
-                },
-              );
-            }
-          );
+            barrierDismissible: false,
+              context: context,
+              builder: (context) {
+                return BlocBuilder<OptionBloc, OptionState>(
+                  builder: (context, state) {
+                    return FadeIn(
+                      duration: const Duration(milliseconds: 500),
+                      child: AlertDialog(
+                        scrollable: true,
+                        actionsAlignment: MainAxisAlignment.center,
+                        title: const _Title(),
+                        content: _Content(options: state.option),
+                        actions: state.option == 0
+                            ? _buttons(state.option, context)
+                            : state.option != 1
+                                ? _salir(context)
+                                : [],
+                      ),
+                    );
+                  },
+                );
+              });
         },
         tooltip: 'Increment',
         child: const Icon(Icons.add),
-      ), 
+      ),
     );
   }
 
-  List<Widget> _buttons(int options, StateSetter setState, BuildContext context) {
+  List<Widget> _buttons(int options, BuildContext context) {
     return [
       OutlinedButton(
-        onPressed: () {
-          setState(() => _options++);
-          Future.delayed( const Duration(milliseconds: 1500), () {
-            _options = 2 + Random().nextInt(2);
-            setState(() {});
-          });
-        
-        },
-        child: const Text('ENTREGAR')
-      ),
+          onPressed: () => BlocProvider.of<OptionBloc>(context).add(ChangeOption()),
+          child: const Text('ENTREGAR')),
       OutlinedButton(
-        onPressed: () => Navigator.of(context).pop(),
-        child: const Text('CANCELAR')
-      ),
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('CANCELAR')),
     ];
   }
 
-  List<Widget> _salir( BuildContext context) {
+  List<Widget> _salir(BuildContext context) {
     return [
       Row(
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('ACEPTAR')
-            ),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  BlocProvider.of<OptionBloc>(context).add(StateInitial());
+                },
+                child: const Text('ACEPTAR')),
           ),
         ],
       ),
     ];
   }
-
 }
 
 class _Title extends StatelessWidget {
@@ -123,43 +120,35 @@ class _Title extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RichText(
-      textAlign: TextAlign.center,
-      text:const TextSpan(
-        children: [
-           TextSpan(
-            text: 'ENTREGAR PEDIDO\n',
-            style: TextStyle(color: Colors.black)
-          ),
-           TextSpan(
-            text:'#1234567899854-12' ,
-            style: TextStyle(color: Colors.black, fontSize: 22.0)
-          ),
-        ]
-      )
-    );
+        textAlign: TextAlign.center,
+        text: const TextSpan(children: [
+          TextSpan(
+              text: 'ENTREGAR PEDIDO\n', style: TextStyle(color: Colors.black)),
+          TextSpan(
+              text: '#1234567899854-12',
+              style: TextStyle(color: Colors.black, fontSize: 22.0)),
+        ]));
   }
 }
 
 class _Content extends StatelessWidget {
-  
-  const _Content({ required this.options }) : super();
+  const _Content({required this.options}) : super();
 
   final int options;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 150.0,
-      child: Center(
-        child: options == 0 
-          ? const _Principal()
-          : options == 1
-          ? const _Cargando()
-          : options == 2
-          ? const _Success()
-          : const _Failed(),
-      )
-    );
+        height: 150.0,
+        child: Center(
+          child: options == 0
+              ? const _Principal()
+              : options == 1
+                  ? const _Cargando()
+                  : options == 2
+                      ? const _Success()
+                      : const _Failed(),
+        ));
   }
 }
 
@@ -169,23 +158,25 @@ class _Failed extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BounceInLeft(
-      duration: const Duration(seconds: 1),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          FadeIn(
-            delay: const Duration(milliseconds: 700),
-            child: const Icon(Icons.clear, size: 60.0, color: Colors.red,)
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Text('FALLO LA ENTREGA'),
-            ],
-          ),
-        ],
-      )
-    );
+        duration: const Duration(seconds: 1),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            FadeIn(
+                delay: const Duration(milliseconds: 700),
+                child: const Icon(
+                  Icons.clear,
+                  size: 60.0,
+                  color: Colors.red,
+                )),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Text('FALLO LA ENTREGA'),
+              ],
+            ),
+          ],
+        ));
   }
 }
 
@@ -195,23 +186,25 @@ class _Success extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BounceInRight(
-      duration: const Duration(seconds: 1),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          FadeIn(
-            delay: const Duration(milliseconds: 700),
-            child: const Icon(Icons.check, size: 60.0, color: Colors.green,)
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-               Text('ENTREGA EXITOSA'),
-            ],
-          ),
-        ],
-      )
-    );
+        duration: const Duration(seconds: 1),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            FadeIn(
+                delay: const Duration(milliseconds: 700),
+                child: const Icon(
+                  Icons.check,
+                  size: 60.0,
+                  color: Colors.green,
+                )),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Text('ENTREGA EXITOSA'),
+              ],
+            ),
+          ],
+        ));
   }
 }
 
@@ -224,10 +217,16 @@ class _Cargando extends StatelessWidget {
       duration: const Duration(seconds: 1),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children:  [
-           const CircularProgressIndicator(),
-           const SizedBox(height: 10.0,),
-           BounceInLeft(child: const Text('ENTREGANDO...', style: TextStyle(color: Colors.black, letterSpacing: 2.0), ))
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(
+            height: 10.0,
+          ),
+          BounceInLeft(
+              child: const Text(
+            'ENTREGANDO...',
+            style: TextStyle(color: Colors.black, letterSpacing: 2.0),
+          ))
         ],
       ),
     );
@@ -244,7 +243,7 @@ class _Principal extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
-        children:  [
+        children: [
           const Divider(height: 0.0, color: Colors.black),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -263,13 +262,19 @@ class _Principal extends StatelessWidget {
               children: [
                 Column(
                   children: const [
-                    Text('DNI', style: TextStyle(fontSize: 12.0),),
+                    Text(
+                      'DNI',
+                      style: TextStyle(fontSize: 12.0),
+                    ),
                     Text('24519852'),
                   ],
                 ),
                 Column(
                   children: const [
-                    Text('TELEFONO', style: TextStyle(fontSize: 12.0),),
+                    Text(
+                      'TELEFONO',
+                      style: TextStyle(fontSize: 12.0),
+                    ),
                     Text('3815684753'),
                   ],
                 ),
@@ -277,12 +282,13 @@ class _Principal extends StatelessWidget {
             ),
           ),
           const DecoratedBox(
-            decoration:  BoxDecoration(
+            decoration: BoxDecoration(
               color: Colors.red,
             ),
             child: Padding(
               padding: EdgeInsets.all(2.0),
-              child: Text('BULTOS: 2', style: TextStyle(fontWeight: FontWeight.bold) ),
+              child: Text('BULTOS: 2',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
         ],
